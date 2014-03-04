@@ -1,72 +1,50 @@
-var roller = require('./lib/roller.js');
-var finder = require('findit');
+var merkleDir = require('merkle-dir');
 var fs = require('fs');
+var path = require('path');
 var through = require('through2');
+var concat = require('concat-stream');
+var crypto = require('crypto');
 
-module.exports = function (files, opts) {
+module.exports = prelude;
+
+function prelude (files, opts) {
     if (!opts) opts = {};
     if (!Array.isArray(files)) {
         files = [ files ].filter(Boolean);
     }
-    var fileId = 0;
+    var fileId = 0, pending = files.length;;
+    var root = {};
     
-    files.forEach(function (file) {
+    files.forEach(function (rel) {
+        var file = path.resolve(rel);
         fs.stat(file, function (err, s) {
-            if (err) stream.emit('error', err)
-            else withStat(file, s)
+            if (err) return stream.emit('error', err);
+            withStat(file, s);
         });
     });
     
+    var output = through();
+    return output;
+    
     function withStat (file, s) {
         if (s.isDirectory()) {
-            var find = finder(file);
-            //var r = roller(dir);
+            merkleDir(file, cb);
         }
         else if (s.isFile()) {
-            fs.createReadStream(file)
-                .pipe(roller(opts))
-                .pipe(pack(fileId++, { minSize: opts.minFrameSize }))
-                .pipe(stream)
-            ;
+            merkleFile(file, cb);
+        }
+        function cb (err, tree) {
+            if (err) return output.emit('error', err);
+            output.push(JSON.stringify(tree) + '\n');
         }
     }
-    
-    var stream = through();
-    return stream;
-};
+}
 
-function pack (id, opts) {
-    if (!opts) opts = {};
-    var size = opts.minSize || 512;
-    
-    var buffered = 0, buffer;
-    return through(write, end);
-    
-    function write (buf, enc, next) {
-        if (buffered + buf.length < size) {
-            buffer = buffer ? Buffer.concat([ buffer, buf ]) : buf;
-            buffered += buf.length;
-            return next();
-        }
-        if (buffer) {
-            buf = Buffer.concat([ buffer, buf ]);
-            buffered = 0;
-            buffer = null;
-        }
-        push.call(this, buf);
-        next();
-    }
-    
-    function end (next) {
-        if (buffer) push.call(this, buffer);
-        push.call(this, new Buffer(0));
-        this.push(null);
-        next();
-    }
-    
-    function push (buf) {
-        this.push(Buffer.concat([
-            Buffer(id + '!' + buf.length + '!'), buf
-        ]));
-    }
+function merkleFile (file, cb) {
+    var h = crypto.createHash('sha256', { encoding: 'hex' });
+    var rs = fs.createReadStream(file);
+    rs.on('error', cb);
+    rs.pipe(h).pipe(concat(function (hash) {
+        cb(null, { path: file, hash: hash });
+    }));
 }
