@@ -1,9 +1,12 @@
 var merkleDir = require('merkle-dir');
 var fs = require('fs');
 var path = require('path');
+var crypto = require('crypto');
+
 var through = require('through2');
 var concat = require('concat-stream');
-var crypto = require('crypto');
+var combine = require('stream-combiner');
+var split = require('split');
 
 module.exports = prelude;
 
@@ -23,8 +26,14 @@ function prelude (files, opts) {
         });
     });
     
-    var output = through();
-    return output;
+    var output = through(write);
+    var stream = combine(split(), output);
+    return stream;
+    
+    function write (line) {
+        var row = JSON.parse(line);
+        console.log(row);
+    }
     
     function withStat (file, s) {
         if (s.isDirectory()) {
@@ -34,7 +43,7 @@ function prelude (files, opts) {
             merkleFile(file, cb);
         }
         function cb (err, tree) {
-            if (err) return output.emit('error', err);
+            if (err) return stream.emit('error', err);
             output.push(JSON.stringify(tree) + '\n');
         }
     }
