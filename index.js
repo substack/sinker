@@ -15,8 +15,7 @@ function prelude (files, opts) {
     if (!Array.isArray(files)) {
         files = [ files ].filter(Boolean);
     }
-    var fileId = 0, pending = files.length;;
-    var root = {};
+    var trees = {}, pending = 2;
     
     files.forEach(function (rel) {
         var file = path.resolve(rel);
@@ -26,13 +25,25 @@ function prelude (files, opts) {
         });
     });
     
+    var first = true;
     var output = through(write);
     var stream = combine(split(), output);
     return stream;
     
+    function done () {
+        if (-- pending !== 0) return;
+        var own = flatten(trees.own);
+        var other = flatten(trees.other);
+        var ops = computeOps(own, other);
+        console.log(ops);
+    }
+    
     function write (line) {
-        var row = JSON.parse(line);
-        console.log(row);
+        if (first) {
+            trees.other = JSON.parse(line);
+            first = false;
+            return done();
+        }
     }
     
     function withStat (file, s) {
@@ -42,10 +53,48 @@ function prelude (files, opts) {
         else if (s.isFile()) {
             merkleFile(file, cb);
         }
-        function cb (err, tree) {
+        function cb (err, t) {
             if (err) return stream.emit('error', err);
-            output.push(JSON.stringify(tree) + '\n');
+            trees.own = t;
+            output.push(JSON.stringify(t) + '\n');
+            done();
         }
+    }
+    
+    function flatten (root) {
+        var files = {};
+        var hashes = {};
+        (function walk (node) {
+            if (node.tree) {
+                for (var i = 0; i < node.tree.length; i++) {
+                    walk(node.tree[i]);
+                }
+            }
+            else {
+                hashes[node.hash] = node.path;
+                files[node.path] = node.hash;
+            }
+        })(root);
+        return { hashes: hashes, files: files };
+    }
+    
+    function computeOps (own, other) {
+        var ops = [];
+        var keys = Object.keys(other.hashes);
+        for (var i = 0; i < keys.length; i++) {
+            var h = keys[i];
+            var p = other.hashes[h];
+            if (h === own.files[p]) continue;
+            
+            if (own.hashes[h]) {
+                ops.push([ 'move', p, own.hashes[h] ]);
+            }
+            else if (!own.files[p]) {
+                ops.push([ 'need', p ]);
+            }
+            else ops.push([ 'update', p ]);
+        }
+        return ops;
     }
 }
 
