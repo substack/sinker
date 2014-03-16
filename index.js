@@ -35,15 +35,23 @@ function prelude (files, opts) {
         var own = flatten(trees.own);
         var other = flatten(trees.other);
         var ops = computeOps(own, other);
-        console.log(ops);
+        ops.forEach(function (op) {
+            output.push(JSON.stringify(op) + '\n');
+        });
     }
     
-    function write (line) {
+    function write (line, enc, next) {
+        try { var row = JSON.parse(line) }
+        catch (err) { return next(err) }
+        
         if (first) {
             trees.other = JSON.parse(line);
             first = false;
-            return done();
+            done();
+            return next();
         }
+        console.log(row);
+        next();
     }
     
     function withStat (file, s) {
