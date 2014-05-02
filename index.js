@@ -9,7 +9,7 @@ var concat = require('concat-stream');
 var Duplex = require('readable-stream').Duplex;
 var split = require('split');
 
-var multiplex = require('multiplex');
+var mdm = require('mux-demux');
 
 module.exports = function (dir) {
     return new Sinker(dir).plex;
@@ -19,15 +19,15 @@ function Sinker (dir) {
     var self = this;
     if (!(this instanceof Sinker)) return new Sinker(dir);
     
-    var plex = multiplex(function (err, stream, id) {
-        console.log('STREAM', id);
+    var plex = mdm(function (stream) {
+        console.log('STREAM', stream.meta);
+        stream.pipe(self.readCommands());
     });
     this.plex = plex;
     this.dir = dir;
     this.files = { local: {}, remote: {} };
     
     this.cmd = plex.createStream('C');
-    this.cmd.pipe(self.readCommands());
     
     var w = walkDir(dir);
     w.on('file', function (file, stat) {
