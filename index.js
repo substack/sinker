@@ -10,32 +10,24 @@ var Duplex = require('readable-stream').Duplex;
 var split = require('split');
 
 var multiplex = require('multiplex');
-var names = { cmd: 'C' };
 
 module.exports = function (dir) {
+    return new Sinker(dir).plex;
+};
+
+function Sinker (dir) {
+    var self = this;
+    if (!(this instanceof Sinker)) return new Sinker(dir);
+    
     var plex = multiplex(function (err, stream, id) {
         console.log('STREAM', id);
     });
-    plex._sinker = new Sinker(dir, plex);
-    return plex;
-};
-
-function Sinker (dir, plex) {
-    var self = this;
-    if (!(this instanceof Sinker)) return new Sinker(dir, plex);
-    
     this.plex = plex;
     this.dir = dir;
     this.files = { local: {}, remote: {} };
     
-    this.cmd = plex.createStream(names.cmd);
-    this.cmd.pipe(split()).pipe(through(function (buf, enc, next) {
-        try { var row = JSON.parse(buf.toString('utf8')) }
-        catch (err) { return next() }
-        
-        self.execute(row);
-        next();
-    }));
+    this.cmd = plex.createStream('C');
+    this.cmd.pipe(self.readCommands());
     
     var w = walkDir(dir);
     w.on('file', function (file, stat) {
@@ -53,6 +45,19 @@ Sinker.prototype.execute = function (cmd) {
 
 Sinker.prototype.send = function (cmd) {
     this.cmd.write(JSON.stringify(cmd) + '\n');
+};
+
+Sinker.prototype.readCommands = function () {
+    var self = this;
+    var sp = split();
+    sp.pipe(through(function (buf, enc, next) {
+        try { var row = JSON.parse(buf.toString('utf8')) }
+        catch (err) { return next() }
+        
+        self.execute(row);
+        next();
+    }));
+    return sp;
 };
 
 function hashFile (file, cb) {
