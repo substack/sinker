@@ -20,7 +20,6 @@ function Sinker (dir) {
     if (!(this instanceof Sinker)) return new Sinker(dir);
     
     var plex = mdm(function (stream) {
-        console.log('STREAM', stream.meta);
         stream.pipe(self.readCommands());
     });
     this.plex = plex;
@@ -28,16 +27,34 @@ function Sinker (dir) {
     this.files = { local: {}, remote: {} };
     
     this.cmd = plex.createStream('C');
+    this.send([ 'MODE', 'PRELUDE' ]);
     
+    this._prelude();
+}
+
+Sinker.prototype._prelude = function () {
+    var self = this;
+    var dir = this.dir;
     var w = walkDir(dir);
+    var pending = 1;
+    
     w.on('file', function (file, stat) {
+        pending ++;
         var rel = path.relative(dir, path.resolve(dir, file));
         hashFile(file, function (err, hash) {
             self.files.local[rel] = hash;
             self.send([ 'HASH', rel, hash ]);
+            if (-- pending === 0) done();
         });
     });
-}
+    w.on('end', function () {
+        if (-- pending === 0) done();
+    });
+    
+    function done () {
+        self.send([ 'MODE', 'SYNC' ]);
+    }
+};
 
 Sinker.prototype.execute = function (cmd) {
     console.log('EXECUTE', cmd);
