@@ -9,7 +9,7 @@ var concat = require('concat-stream');
 var Duplex = require('readable-stream').Duplex;
 var split = require('split');
 
-var version = require('./package.json').version;
+var version = require('./package.json').protocolVersion;
 
 var mdm = require('mux-demux');
 
@@ -27,9 +27,11 @@ function Sinker (dir) {
     this.plex = plex;
     this.dir = dir;
     this.files = { local: {}, remote: {} };
+    this._clockSkew = 0;
     
     this.cmd = plex.createStream('C');
-    this.send([ 'VERSION', version, Date.now() ]);
+    this._startTime = Date.now();
+    this.send([ 'VERSION', version, this._startTime ]);
     
     this.mode = 'PRELUDE';
     this._prelude();
@@ -64,7 +66,11 @@ Sinker.prototype._sync = function () {
 
 Sinker.prototype.execute = function (cmd) {
     console.log('EXECUTE', cmd);
-    if (this.mode === 'PRELUDE' && cmd[0] === 'MODE' && cmd[1] === 'SYNC') {
+    if (cmd[0] === 'VERSION') {
+        this._clockSkew = this._startTime - cmd[2];
+    }
+    else if (this.mode === 'PRELUDE'
+    && cmd[0] === 'MODE' && cmd[1] === 'SYNC') {
         this._sync();
     }
 };
@@ -87,7 +93,7 @@ Sinker.prototype.readCommands = function () {
 };
 
 function hashFile (file, cb) {
-    var h = crypto.createHash('sha256', { encoding: 'hex' });
+    var h = crypto.createHash('sha256', { encoding: 'base64' });
     var rs = fs.createReadStream(file);
     rs.on('error', cb);
     rs.pipe(h).pipe(concat(function (hash) {
