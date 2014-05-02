@@ -47,7 +47,10 @@ Sinker.prototype._prelude = function () {
         pending ++;
         var rel = path.relative(dir, path.resolve(dir, file));
         hashFile(file, function (err, hash) {
-            self.files.local[rel] = hash;
+            self.files.local[rel] = {
+                hash: hash,
+                time: stat.mtime.valueOf()
+            };
             self.send([ 'HASH', rel, hash, stat.mtime.valueOf() ]);
             if (-- pending === 0) done();
         });
@@ -62,16 +65,25 @@ Sinker.prototype._prelude = function () {
 };
 
 Sinker.prototype._sync = function () {
+    this.mode = 'SYNC';
+    console.log(this.files);
 };
 
 Sinker.prototype.execute = function (cmd) {
-    console.log('EXECUTE', cmd);
     if (cmd[0] === 'VERSION') {
         this._clockSkew = this._startTime - cmd[2];
     }
-    else if (this.mode === 'PRELUDE'
-    && cmd[0] === 'MODE' && cmd[1] === 'SYNC') {
-        this._sync();
+    else if (cmd[0] === 'MODE') {
+        if (this.mode === 'PRELUDE' && cmd[1] === 'SYNC') {
+            this._sync();
+        }
+    }
+    else if (cmd[0] === 'HASH') {
+        var file = cmd[1];
+        this.files.remote[file] = {
+            hash: cmd[2],
+            time: cmd[3] + this._clockSkew
+        };
     }
 };
 
