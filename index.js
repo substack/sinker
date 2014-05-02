@@ -31,12 +31,13 @@ function Sinker (dir) {
     this.cmd = plex.createStream('C');
     this.send([ 'VERSION', version, Date.now() ]);
     
+    this.mode = 'PRELUDE';
     this._prelude();
 }
 
 Sinker.prototype._prelude = function () {
     var self = this;
-    var dir = this.dir;
+    var dir = path.resolve(this.dir);
     var w = walkDir(dir);
     var pending = 1;
     
@@ -45,7 +46,7 @@ Sinker.prototype._prelude = function () {
         var rel = path.relative(dir, path.resolve(dir, file));
         hashFile(file, function (err, hash) {
             self.files.local[rel] = hash;
-            self.send([ 'HASH', rel, hash ]);
+            self.send([ 'HASH', rel, hash, stat.mtime.valueOf() ]);
             if (-- pending === 0) done();
         });
     });
@@ -58,8 +59,14 @@ Sinker.prototype._prelude = function () {
     }
 };
 
+Sinker.prototype._sync = function () {
+};
+
 Sinker.prototype.execute = function (cmd) {
     console.log('EXECUTE', cmd);
+    if (this.mode === 'PRELUDE' && cmd[0] === 'MODE' && cmd[1] === 'SYNC') {
+        this._sync();
+    }
 };
 
 Sinker.prototype.send = function (cmd) {
