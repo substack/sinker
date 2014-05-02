@@ -27,6 +27,7 @@ function Sinker (dir) {
     this.plex = plex;
     this.dir = dir;
     this.files = { local: {}, remote: {} };
+    this.hashes = { local: {}, remote: {} };
     this._clockSkew = 0;
     
     this.cmd = plex.createStream('C');
@@ -47,10 +48,14 @@ Sinker.prototype._prelude = function () {
         pending ++;
         var rel = path.relative(dir, path.resolve(dir, file));
         hashFile(file, function (err, hash) {
-            self.files.local[rel] = {
+            var row = {
                 hash: hash,
                 time: stat.mtime.valueOf()
             };
+            self.files.local[rel] = row;
+            if (!self.hashes.local[hash]) self.hashes.local[hash] = [];
+            self.hashes.local[hash].push(row);
+            
             self.send([ 'HASH', rel, hash, stat.mtime.valueOf() ]);
             if (-- pending === 0) done();
         });
@@ -65,8 +70,14 @@ Sinker.prototype._prelude = function () {
 };
 
 Sinker.prototype._sync = function () {
+    var self = this;
     this.mode = 'SYNC';
-    console.log(this.files);
+    
+    var ops = [];
+    Object.keys(this.files.remote).forEach(function (key) {
+        // ...
+    });
+    console.log(self.hashes);
 };
 
 Sinker.prototype.execute = function (cmd) {
@@ -79,11 +90,14 @@ Sinker.prototype.execute = function (cmd) {
         }
     }
     else if (cmd[0] === 'HASH') {
-        var file = cmd[1];
-        this.files.remote[file] = {
-            hash: cmd[2],
+        var file = cmd[1], hash = cmd[2];
+        var row = {
+            hash: hash,
             time: cmd[3] + this._clockSkew
         };
+        this.files.remote[file] = row;
+        if (!this.hashes.remote[hash]) this.hashes.remote[hash] = [];
+        this.hashes.remote[hash].push(row);
     }
 };
 
