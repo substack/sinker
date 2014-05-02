@@ -9,6 +9,8 @@ var concat = require('concat-stream');
 var Duplex = require('readable-stream').Duplex;
 var split = require('split');
 
+var version = require('./package.json').version;
+
 var mdm = require('mux-demux');
 
 module.exports = function (dir) {
@@ -27,7 +29,7 @@ function Sinker (dir) {
     this.files = { local: {}, remote: {} };
     
     this.cmd = plex.createStream('C');
-    this.send([ 'MODE', 'PRELUDE' ]);
+    this.send([ 'VERSION', version, Date.now() ]);
     
     this._prelude();
 }
