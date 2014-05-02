@@ -10,32 +10,32 @@ var Duplex = require('readable-stream').Duplex;
 var split = require('split');
 
 var multiplex = require('multiplex');
+var names = { cmd: 'C' };
 
-inherits(Sinker, Duplex);
-module.exports = Sinker;
-
-var names = {
-    cmd: 'C'
-};
-
-function Sinker (dir) {
-    var self = this;
-    if (!(this instanceof Sinker)) return new Sinker(dir);
-    Duplex.call(this);
-    
-    this.plex = multiplex(function (err, stream, id) {
+module.exports = function (dir) {
+    var plex = multiplex(function (err, stream, id) {
         console.log('STREAM', id);
     });
+    plex._sinker = new Sinker(dir, plex);
+    return plex;
+};
+
+function Sinker (dir, plex) {
+    var self = this;
+    if (!(this instanceof Sinker)) return new Sinker(dir, plex);
     
-    var cmd = this.plex.createStream(names.cmd);
-    this.cmdStream = cmd;
-    cmd.pipe(split()).pipe(through(function (buf, enc, next) {
-        try { var row = JSON.parse(buf.toString('utf8')) }
-        catch (err) { return }
-        self.execute(row);
-    }));
-    
+    this.plex = plex;
+    this.dir = dir;
     this.files = { local: {}, remote: {} };
+    
+    this.cmd = plex.createStream(names.cmd);
+    this.cmd.pipe(split()).pipe(through(function (buf, enc, next) {
+        try { var row = JSON.parse(buf.toString('utf8')) }
+        catch (err) { return next() }
+        
+        self.execute(row);
+        next();
+    }));
     
     var w = walkDir(dir);
     w.on('file', function (file, stat) {
@@ -45,31 +45,14 @@ function Sinker (dir) {
             self.send([ 'HASH', rel, hash ]);
         });
     });
-    this.on('error', function () {});
 }
-
-Sinker.prototype._write = function (buf, enc, next) {
-    this.plex._write(buf, enc, next);
-};
-
-Sinker.prototype._read = function (n) {
-    var self = this;
-    var buf, times = 0;
-    while ((buf = this.plex.read(n)) !== null) {
-        times ++;
-        if (!this.push(buf)) break;
-    }
-    if (times === 0) {
-        this.plex.on('readable', function () { self.read(n) });
-    }
-};
 
 Sinker.prototype.execute = function (cmd) {
     console.log('EXECUTE', cmd);
 };
 
 Sinker.prototype.send = function (cmd) {
-    this.cmdStream.write(JSON.stringify(cmd) + '\n');
+    this.cmd.write(JSON.stringify(cmd) + '\n');
 };
 
 function hashFile (file, cb) {
