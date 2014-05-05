@@ -105,7 +105,7 @@ Sinker.prototype._sync = function () {
             ops.push([ 'FETCH', lf.hash, key ]);
         }
     });
-    console.log(ops);
+    this.emit('ops', ops);
 };
 
 Sinker.prototype.execute = function (cmd) {
