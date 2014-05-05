@@ -16,16 +16,16 @@ test('verify operation lists', function (t) {
     
     a.on('ops', function (ops) {
         t.deepEqual(ops, [
-            [ 'FETCH', 'two.txt' ],
+            [ 'MOVE', 'here.txt', 'there.txt' ],
             [ 'FETCH', 'three.txt' ],
-            [ 'MOVE', 'here.txt', 'there.txt' ]
+            [ 'FETCH', 'two.txt' ]
         ]);
     });
     
     b.on('ops', function (ops) {
         t.deepEqual(ops, [
-            [ 'FETCH', 'one.txt' ],
-            [ 'FETCH', 'foo/beep.txt' ]
+            [ 'FETCH', 'foo/beep.txt' ],
+            [ 'FETCH', 'one.txt' ]
         ]);
     });
     

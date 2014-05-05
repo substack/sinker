@@ -95,14 +95,38 @@ Sinker.prototype._sync = function () {
     this.mode = 'SYNC';
     
     var ops = [];
-    Object.keys(this.files.local).forEach(function (key) {
+    var files = (function () {
+        var fmap = {};
+        Object.keys(self.files.local).forEach(function (key) {
+            fmap[key] = true;
+        });
+        Object.keys(self.files.remote).forEach(function (key) {
+            fmap[key] = true;
+        });
+        return Object.keys(fmap).sort();
+    })();
+    
+    files.forEach(function (key) {
         var lf = self.files.local[key];
         var rf = self.files.remote[key];
-        if (!rf && self.hashes[lf.hash]) {
-            ops.push([ 'COPY', key, self.hashes[lf.hash] ]);
+        
+        if (lf && rf && lf.hash !== rf.hash) {
+            // TODO: intelligent diffing goes here
+            //ops.push([ 'UPDATE', key ]);
+            // FOR NOW: most recent stamp wins
+            if (lf.time < rf.time) {
+                ops.push([ 'FETCH', key ]);
+            }
         }
-        else if (!rf) {
-            ops.push([ 'FETCH', lf.hash, key ]);
+        else if (rf && !lf && self.hashes.local[rf.hash]) {
+            var lh = self.hashes.local[rf.hash][0];
+            var lfm = self.files.local[lh];
+            if (lfm.time < rf.time) {
+                ops.push([ 'MOVE', lh, key ]);
+            }
+        }
+        else if (rf && !lf) {
+            ops.push([ 'FETCH', key ]);
         }
     });
     this.emit('ops', ops);
