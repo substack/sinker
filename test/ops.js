@@ -2,6 +2,11 @@ var sinker = require('../');
 var path = require('path');
 var net = require('net');
 var test = require('tape');
+var fs = require('fs');
+
+// bump the ctime on two.txt:
+var twofile = path.join(__dirname, 'ops/b/two.txt');
+fs.writeFileSync(twofile, fs.readFileSync(twofile));
 
 test('verify operation lists', function (t) {
     t.plan(2);
@@ -11,16 +16,15 @@ test('verify operation lists', function (t) {
     
     a.on('ops', function (ops) {
         t.deepEqual(ops, [
-            [ 'UPDATE', 'two.txt' ],
+            [ 'FETCH', 'two.txt' ],
             [ 'FETCH', 'three.txt' ],
-            [ 'MOVE', 'here.txt', 'three.txt' ]
+            [ 'MOVE', 'here.txt', 'there.txt' ]
         ]);
     });
     
     b.on('ops', function (ops) {
         t.deepEqual(ops, [
             [ 'FETCH', 'one.txt' ],
-            [ 'UPDATE', 'two.txt' ],
             [ 'FETCH', 'foo/beep.txt' ]
         ]);
     });
