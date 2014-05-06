@@ -36,12 +36,14 @@ test('move setup', function (t) {
         t.ifError(errs);
         
         // bump ctimes of files so they win:
-        bump(path.join(dirs.b, 'two.txt'), function (err) {
-            t.ifError(err);
-        });
-        bump(path.join(dirs.b, 'there.txt'), function (err) {
-            t.ifError(err);
-        });
+        setTimeout(function () {
+            bump(path.join(dirs.b, 'two.txt'), function (err) {
+                t.ifError(err);
+            });
+            bump(path.join(dirs.b, 'there.txt'), function (err) {
+                t.ifError(err);
+            });
+        }, 1000);
     });
 });
 
