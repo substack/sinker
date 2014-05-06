@@ -1,0 +1,45 @@
+{
+  "name": "sinker",
+  "version": "1.0.0",
+  "description": "synchronize remote directories",
+  "main": "index.js",
+  "dependencies": {
+    "concat-stream": "~1.4.5",
+    "findit": "~1.2.0",
+    "inherits": "~2.0.1",
+    "minimist": "~0.0.8",
+    "mkdirp": "~0.5.0",
+    "mux-demux": "~3.7.8",
+    "readable-stream": "~1.1.13-1",
+    "split": "~0.3.0",
+    "through2": "~1.0.0"
+  },
+  "devDependencies": {
+    "tape": "~2.12.1",
+    "typewise": "~0.7.0",
+    "cpr": "~0.1.1",
+    "rimraf": "~2.2.7"
+  },
+  "scripts": {
+    "test": "tape test/*.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/substack/sinker.git"
+  },
+  "homepage": "https://github.com/substack/sinker",
+  "keywords": [
+    "synchronize",
+    "replication",
+    "file",
+    "directory",
+    "rsync",
+    "dropbox"
+  ],
+  "author": {
+    "name": "James Halliday",
+    "email": "mail@substack.net",
+    "url": "http://substack.net"
+  },
+  "license": "MIT"
+}
