@@ -77,7 +77,6 @@ to perform.
 # todo
 
 * intelligent transfers for files with hash mismatches using the rsync algorithm
-* watch mode
 * faster multiplexer better for binary
 * pluggable multiplexer for pipelined transports like http
 
