@@ -79,7 +79,7 @@ Sinker.prototype._prelude = function () {
     w.on('file', function (file, stat) {
         pending ++;
         var rel = path.relative(dir, path.resolve(dir, file));
-        hashFile(file, function (err, hash) {
+        self._hashFile(file, function (err, hash) {
             self.files.local[rel] = {
                 hash: hash,
                 time: stat.mtime.valueOf()
@@ -178,7 +178,7 @@ Sinker.prototype._sendOps = function (ops) {
         });
         
         function rename () {
-            fs.rename(tmpfile, rfile, function (err) {
+            self._fs.rename(tmpfile, rfile, function (err) {
                 if (err) return onerror(err);
                 delete fetches[stream.meta];
                 done();
@@ -301,9 +301,9 @@ Sinker.prototype.readCommands = function () {
     return sp;
 };
 
-function hashFile (file, cb) {
+Sinker.prototype._hashFile = function (file, cb) {
     var h = crypto.createHash('sha256', { encoding: 'base64' });
-    var rs = fs.createReadStream(file);
+    var rs = this._fs.createReadStream(file);
     rs.on('error', cb);
     rs.pipe(h).pipe(concat(function (hash) {
         cb(null, hash);
