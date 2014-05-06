@@ -112,6 +112,7 @@ Sinker.prototype._watch = function (rel) {
     var self = this;
     if (this.options.watch === false) return;
     var file = path.join(this.dir, rel);
+    if (this._watchers[rel]) return;
     
     var w = this._fs.watch(file);
     w.on('error', function (err) {
@@ -127,6 +128,7 @@ Sinker.prototype._watch = function (rel) {
         changing = true;
         setTimeout(onchange, 600);
     });
+    this.emit('watch', rel);
     
     function onchange () {
         var pending = 2, stat, hash;
@@ -158,7 +160,7 @@ Sinker.prototype._watch = function (rel) {
             prev = self.files.local[rel];
             
             changing = false;
-console.log('SEND', file); 
+            self.emit('changed', rel, hash, stat.mtime.valueOf());
             self.send([ 'HASH', rel, hash, stat.mtime.valueOf() ]);
         }
         
@@ -166,6 +168,15 @@ console.log('SEND', file);
             changing = false;
         }
     }
+};
+
+Sinker.prototype._unwatch = function (rel) {
+    var self = this;
+    if (this.options.watch === false) return;
+    var w = this._watchers[rel];
+    if (w) w.close();
+    delete this._watchers[rel];
+    if (w) this.emit('unwatch', rel);
 };
 
 Sinker.prototype._sync = function () {
@@ -207,9 +218,9 @@ Sinker.prototype._sync = function () {
             ops.push([ 'FETCH', key ]);
         }
     });
-    this.emit('ops', ops);
     
     if (this.options.write !== false) this._sendOps(ops);
+    else this.emit('ops', ops);
 };
 
 Sinker.prototype._sendOps = function (ops) {
@@ -217,6 +228,7 @@ Sinker.prototype._sendOps = function (ops) {
     var pending = [];
     var fetches = {};
     
+    this.emit('ops', ops);
     this.on('ok', onok);
     this.on('stream', onstream);
     
@@ -240,6 +252,8 @@ Sinker.prototype._sendOps = function (ops) {
         
         var rfile = path.join(self.dir, file);
         var rdir = path.dirname(rfile);
+        self._unwatch(file);
+        
         mkdirp(rdir, { fs: self._fs }, function (err) {
             if (err) return onerror(err);
             if (--pending === 0) rename();
@@ -249,10 +263,8 @@ Sinker.prototype._sendOps = function (ops) {
             self._fs.rename(tmpfile, rfile, function (err) {
                 if (err) return onerror(err);
                 delete fetches[stream.meta];
-                setTimeout(function () {
-                    self._watch(file);
-                    done();
-                }, 100);
+                self._watch(file);
+                done();
             });
         }
         function onerror (err) {
@@ -363,6 +375,8 @@ Sinker.prototype._copy = function (rsrc, rdst, cb) {
     var self = this;
     var src = path.join(this.dir, rsrc);
     var dst = path.join(this.dir, rdst);
+    this._unwatch(rdst);
+    
     var tmpfile = path.join(this._tmpdir, '.sinker-' + Math.random());
     
     var ss = this._fs.createReadStream(src);
@@ -372,8 +386,9 @@ Sinker.prototype._copy = function (rsrc, rdst, cb) {
     
     ts.on('finish', function () {
         self._fs.rename(tmpfile, dst, function (err) {
-            if (err) cb(err);
-            else cb(null);
+            if (err) return cb(err);
+            self._watch(rdst);
+            cb(null);
         });
     });
     ss.pipe(ts);
