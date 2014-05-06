@@ -49,27 +49,27 @@ test('move setup', function (t) {
 });
 
 test('move', function (t) {
-    t.plan(2 + Object.keys(expected).length * 2);
+    t.plan(2 + Object.keys(expected).length * 4);
     
-    var a = sinker(dirs.a);
-    var b = sinker(dirs.b);
+    var a = sinker(dirs.a, { watch: false });
+    var b = sinker(dirs.b, { watch: false });
     
-    a.on('ops', function (ops) {
+    a.once('ops', function (ops) {
         t.deepEqual(ops.sort(typewise.compare), [
             [ 'FETCH', 'three.txt' ],
-            [ 'FETCH', 'two.txt' ],
+            [ 'FETCH', 'two.txt' ]
+        ]);
+    });
+    
+    b.once('ops', function (ops) {
+        t.deepEqual(ops.sort(typewise.compare), [
+            [ 'FETCH', 'foo/beep.txt' ],
+            [ 'FETCH', 'one.txt' ],
             [ 'MOVE', 'here.txt', 'there.txt' ]
         ]);
     });
     
-    b.on('ops', function (ops) {
-        t.deepEqual(ops.sort(typewise.compare), [
-            [ 'FETCH', 'foo/beep.txt' ],
-            [ 'FETCH', 'one.txt' ]
-        ]);
-    });
-    
-    a.on('sync', function () {
+    a.once('sync', function () {
         Object.keys(expected).forEach(function (key) {
             fs.readFile(path.join(dirs.a, key), 'utf8', function (err, src) {
                 t.ifError(err);
@@ -78,7 +78,7 @@ test('move', function (t) {
         });
     });
     
-    b.on('sync', function () {
+    b.once('sync', function () {
         Object.keys(expected).forEach(function (key) {
             fs.readFile(path.join(dirs.a, key), 'utf8', function (err, src) {
                 t.ifError(err);

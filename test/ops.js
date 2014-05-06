@@ -21,15 +21,15 @@ test('verify operation lists', function (t) {
     a.on('ops', function (ops) {
         t.deepEqual(ops.sort(typewise.compare), [
             [ 'FETCH', 'three.txt' ],
-            [ 'FETCH', 'two.txt' ],
-            [ 'MOVE', 'here.txt', 'there.txt' ]
+            [ 'FETCH', 'two.txt' ]
         ]);
     });
     
     b.on('ops', function (ops) {
         t.deepEqual(ops.sort(typewise.compare), [
             [ 'FETCH', 'foo/beep.txt' ],
-            [ 'FETCH', 'one.txt' ]
+            [ 'FETCH', 'one.txt' ],
+            [ 'MOVE', 'here.txt', 'there.txt' ]
         ]);
     });
     

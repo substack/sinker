@@ -263,9 +263,9 @@ Sinker.prototype._sendOps = function (ops) {
         if (pending.length + Object.keys(fetches).length > 0) return;
         self.removeListener('ok', onok);
         self.removeListener('stream', onstream);
-        if (self.mode === 'LIVE') return;
         self.emit('sync');
         
+        if (self.mode === 'LIVE') return;
         if (self.options.watch !== false) {
             self.mode = 'LIVE';
             var rels = Object.keys(self.files.local);
@@ -330,7 +330,7 @@ Sinker.prototype.execute = function (seq, cmd) {
             return this.send([ 'ERROR', seq, 'not allowed' ]);
         }
         if (this.options.write === false) return;
-        this._move(cmd[1], cmd[2], function (err) {
+        this._copy(cmd[1], cmd[2], function (err) {
             if (err) onerror(err)
             else self.send([ 'OK', seq ])
         });
@@ -347,7 +347,7 @@ Sinker.prototype.execute = function (seq, cmd) {
     }
 };
 
-Sinker.prototype._move = function (rsrc, rdst, cb) {
+Sinker.prototype._copy = function (rsrc, rdst, cb) {
     var self = this;
     var src = path.join(this.dir, rsrc);
     var dst = path.join(this.dir, rdst);

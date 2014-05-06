@@ -14,14 +14,14 @@ mkdirp.sync(path.join(__dirname, 'pull/b'));
 test('pull', function (t) {
     t.plan(8);
     
-    var a = sinker(path.join(__dirname, 'pull/a'));
-    var b = sinker(path.join(__dirname, 'pull/b'));
+    var a = sinker(path.join(__dirname, 'pull/a'), { watcher: false });
+    var b = sinker(path.join(__dirname, 'pull/b'), { watcher: false });
     
-    a.on('ops', function (ops) {
+    a.once('ops', function (ops) {
         t.deepEqual(ops.sort(typewise.compare), []);
     });
     
-    b.on('ops', function (ops) {
+    b.once('ops', function (ops) {
         t.deepEqual(ops.sort(typewise.compare), [
             [ 'FETCH', 'foo/beep.txt' ],
             [ 'FETCH', 'four.txt' ],
@@ -31,7 +31,7 @@ test('pull', function (t) {
         ]);
     });
     
-    b.on('sync', function () {
+    b.once('sync', function () {
         var dir = path.join(__dirname, 'pull/b');
         fs.readdir(dir, function (err, files) {
             t.ifError(err);
