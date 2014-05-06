@@ -36,6 +36,7 @@ test('move setup', function (t) {
         t.ifError(errs);
         
         // bump ctimes of files so they win:
+        // wait 1 second because ctime has 1-second precision
         setTimeout(function () {
             bump(path.join(dirs.b, 'two.txt'), function (err) {
                 t.ifError(err);

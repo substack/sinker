@@ -2,6 +2,7 @@ var fs = require('fs');
 var path = require('path');
 var crypto = require('crypto');
 var walkDir = require('findit');
+var os = require('os');
 
 var inherits = require('inherits');
 var through = require('through2');
@@ -40,6 +41,7 @@ function Sinker (dir, opts) {
     this.hashes = { local: {}, remote: {} };
     this._clockSkew = 0;
     this._fs = this.options.fs || fs;
+    this._tmpdir = this.options.tmpdir || (os.tmpdir || os.tmpDir)();
     
     this.cmd = plex.createStream('C');
     this._startTime = Date.now();
@@ -151,6 +153,8 @@ Sinker.prototype._sendOps = function (ops) {
     this.on('stream', onstream);
     
     function onstream (stream) {
+        if (self.options.write === false) return;
+        
         if (!has(fetches, stream.meta)) return;
         var file = fetches[stream.meta];
         if (!file) return;
@@ -236,7 +240,26 @@ Sinker.prototype.execute = function (seq, cmd) {
         rs.pipe(stream);
     }
     else if (cmd[0] === 'MOVE') {
-        console.error('TODO', cmd);
+        if (!allowed(cmd[1]) || !allowed(cmd[2])) {
+            return this.send([ 'ERROR', seq, 'not allowed' ]);
+        }
+        if (this.options.write === false) return;
+        
+        var src = path.join(this.dir, cmd[1]);
+        var dst = path.join(this.dir, cmd[2]);
+        var tmpfile = path.join(this._tmpdir, '.sinker-' + Math.random());
+        
+        var ss = this._fs.createReadStream(src);
+        var ts = this._fs.createWriteStream(tmpfile);
+        ss.on('error', onerror);
+        ts.on('error', onerror);
+        
+        ts.on('finish', function () {
+            self._fs.rename(tmpfile, dst, function (err) {
+                if (err) onerror(err);
+                else self.send([ 'OK', seq ]);
+            });
+        });
     }
     else if (cmd[0] === 'OK') {
         this.emit.apply(this, [ 'ok', seq ].concat(cmd.slice(1)));
