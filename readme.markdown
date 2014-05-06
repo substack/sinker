@@ -31,7 +31,9 @@ sink.pipe(net.connect(5000)).pipe(sink);
 ```
 
 Now modify the files from the directory given by `process.argv[2]` on either
-system. The files are in sync!
+system. The files are in sync! After the initial file exchange, each side
+watches the local set of files for changes and propagates any updates to the
+other end of the connection.
 
 # methods
 
@@ -46,6 +48,8 @@ directory.
 
 * `opts.write` - when `false`, don't write to any local files. This is "push"
 mode.
+* `opts.watch` - when `false`, don't watch the file system for changes after the
+initial synchronization exchange
 * `opts.fs` - pass in a custom [fs](http://nodejs.org/docs/latest/api/fs.html)
 implementation. Otherwise the core node fs will be used.
 * `opts.tmpdir` - use a custom tmpdir for storing files. Otherwise `os.tmpdir()`
