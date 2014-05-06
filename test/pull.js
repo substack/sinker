@@ -29,6 +29,7 @@ test('pull', function (t) {
             [ 'FETCH', 'two.txt' ]
         ]);
     });
+    
     b.on('sync', function () {
         var dir = path.join(__dirname, 'pull/b');
         fs.readdir(dir, function (err, files) {
