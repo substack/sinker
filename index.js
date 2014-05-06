@@ -25,7 +25,12 @@ function Sinker (dir, opts) {
     this.options = opts || {};
     
     var plex = mdm(function (stream) {
-        stream.pipe(self.readCommands());
+        if (stream.meta === 'C') {
+            stream.pipe(self.readCommands());
+        }
+        else {
+            console.log('STREAM', stream.meta); 
+        }
     });
     this.plex = plex;
     this.plexReadable = Readable().wrap(plex);
@@ -136,7 +141,9 @@ Sinker.prototype._sync = function () {
     this.emit('ops', ops);
     
     if (this.options.write !== false) {
+        var pending = 0;
         ops.forEach(function (op) {
+            pending ++;
             self.send(op);
         });
     }
@@ -210,9 +217,8 @@ function hashFile (file, cb) {
 }
 
 function allowed (rfile) {
-    var file = path.resolve(rfile);
-    if (/^[\/\\]/.test(file)) return false;
-    if (/^\w+:/.test(file)) return false;
-    if (/\.\./.test(file)) return false;
+    if (/^[\/\\]/.test(rfile)) return false;
+    if (/^\w+:/.test(rfile)) return false;
+    if (/\.\./.test(rfile)) return false;
     return true;
 }
