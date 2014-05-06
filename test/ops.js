@@ -5,9 +5,12 @@ var test = require('tape');
 var fs = require('fs');
 var typewise = require('typewise');
 
-// bump the ctime on two.txt so that b's version wins:
+// bump ctimes so that b's versions win:
 var twofile = path.join(__dirname, 'ops/b/two.txt');
 fs.writeFileSync(twofile, fs.readFileSync(twofile));
+
+var therefile = path.join(__dirname, 'ops/b/there.txt');
+fs.writeFileSync(twofile, fs.readFileSync(therefile));
 
 test('verify operation lists', function (t) {
     t.plan(2);
