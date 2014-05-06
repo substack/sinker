@@ -10,7 +10,7 @@ var twofile = path.join(__dirname, 'ops/b/two.txt');
 fs.writeFileSync(twofile, fs.readFileSync(twofile));
 
 var therefile = path.join(__dirname, 'ops/b/there.txt');
-fs.writeFileSync(twofile, fs.readFileSync(therefile));
+fs.writeFileSync(therefile, fs.readFileSync(therefile));
 
 test('verify operation lists', function (t) {
     t.plan(2);
