@@ -36,6 +36,14 @@ function Sinker (dir, opts) {
     this.plexReadable = Readable().wrap(plex);
     this.seq = 0;
     
+    this._watchers = {};
+    this.on('finish', function () {
+        Object.keys(self._watchers).forEach(function (rel) {
+            self._watchers[rel].close();
+            delete self._watchers[rel];
+        });
+    });
+    
     this.dir = dir;
     this.files = { local: {}, remote: {} };
     this.hashes = { local: {}, remote: {} };
@@ -100,6 +108,57 @@ Sinker.prototype._prelude = function () {
     }
 };
 
+Sinker.prototype._watch = function (rel) {
+    var self = this;
+    if (this.options.watch === false) return;
+    var file = path.join(this.dir, rel);
+    
+    var w = this._fs.watch(file);
+    this._watchers[rel] = w;
+    var changing = false;
+    
+    w.on('change', function f () {
+        if (changing) return;
+        changing = true;
+        setTimeout(onchange, 600);
+    });
+    
+    function onchange () {
+        var pending = 2, stat, hash;
+        var prev = self.files.local[rel];
+        
+        self._fs.stat(file, function (err, stat_) {
+            if (err) return abort();
+            stat = stat_;
+            if (-- pending === 0) done();
+        });
+        
+        self._hashFile(file, function (err, hash_) {
+            if (err) return abort();
+            hash = hash_;
+            if (--pending === 0) done();
+        });
+        
+        function done () {
+            self.files.local[rel] = {
+                hash: hash,
+                time: stat.mtime.valueOf()
+            };
+            if (!self.hashes.local[hash]) self.hashes.local[hash] = [];
+            
+            var ix = self.hashes.local[prev.hash].indexOf(rel)
+            if (ix >= 0) self.hashes.local[prev.hash].splice(ix, 1);
+            
+            changing = false;
+            self.send([ 'HASH', rel, hash, stat.mtime.valueOf() ]);
+        }
+        
+        function abort () {
+            changing = false;
+        }
+    }
+};
+
 Sinker.prototype._sync = function () {
     var self = this;
     this.mode = 'SYNC';
@@ -131,8 +190,8 @@ Sinker.prototype._sync = function () {
         else if (rf && !lf && self.hashes.local[rf.hash]) {
             var lh = self.hashes.local[rf.hash][0];
             var lfm = self.files.local[lh];
-            if (lfm.time < rf.time) {
-                ops.push([ 'MOVE', lh, key ]);
+            if (lfm.time > rf.time) {
+                ops.push([ 'MOVE', key, lh ]);
             }
         }
         else if (rf && !lf) {
@@ -205,10 +264,18 @@ Sinker.prototype._sendOps = function (ops) {
         self.removeListener('ok', onok);
         self.removeListener('stream', onstream);
         self.emit('sync');
+        
+        if (self.options.watch !== false) {
+            self.mode = 'LIVE';
+            var rels = Object.keys(self.files.local);
+            rels.forEach(function (rel) {
+                self._watch(rel);
+            });
+        }
     }
     
-    function onok (seq) {
-        var ix = pending.indexOf(seq);
+    function onok (seq, rseq) {
+        var ix = pending.indexOf(rseq);
         if (ix < 0) return;
         pending.splice(ix, 1);
         done();
@@ -233,6 +300,10 @@ Sinker.prototype.execute = function (seq, cmd) {
         };
         if (!this.hashes.remote[hash]) this.hashes.remote[hash] = [];
         this.hashes.remote[hash].push(file);
+        
+        if (this.mode === 'LIVE') {
+            console.log(cmd); 
+        }
     }
     else if (cmd[0] === 'FETCH') {
         if (!allowed(cmd[1])) {
@@ -268,6 +339,7 @@ Sinker.prototype.execute = function (seq, cmd) {
                 else self.send([ 'OK', seq ]);
             });
         });
+        ss.pipe(ts);
     }
     else if (cmd[0] === 'OK') {
         this.emit.apply(this, [ 'ok', seq ].concat(cmd.slice(1)));
