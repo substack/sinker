@@ -12,6 +12,16 @@ if (argv.p) {
     var server = net.createServer(function (stream) {
         var s = sinker(dir);
         s.on('error', function (err) {});
+        if (argv.verbose) {
+            s.on('sync', function () {
+                console.error('SYNC');
+            });
+            s.on('ops', function (ops) {
+                ops.forEach(function (ops) {
+                    console.error(ops.join(' '));
+                });
+            });
+        }
         stream.pipe(s).pipe(stream);
     });
     server.listen(argv.p);
@@ -26,8 +36,13 @@ else {
         s.on('sync', function () {
             console.error('SYNC');
         });
+        s.on('ops', function (ops) {
+            ops.forEach(function (ops) {
+                console.error(ops.join(' '));
+            });
+        });
     }
-    s.on('error', function (err) { console.log(err) });
+    s.on('error', function (err) { console.error(err) });
     stream.pipe(s).pipe(stream);
 }
 
