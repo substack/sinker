@@ -12,8 +12,8 @@ fs.writeFileSync(twofile, fs.readFileSync(twofile));
 test('verify operation lists', function (t) {
     t.plan(2);
     
-    var a = sinker(path.join(__dirname, 'ops/a'));
-    var b = sinker(path.join(__dirname, 'ops/b'));
+    var a = sinker(path.join(__dirname, 'ops/a'), { write: false });
+    var b = sinker(path.join(__dirname, 'ops/b'), { write: false });
     
     a.on('ops', function (ops) {
         t.deepEqual(ops.sort(typewise.compare), [

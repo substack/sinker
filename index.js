@@ -17,21 +17,25 @@ var version = require('./package.json').protocolVersion;
 module.exports = Sinker;
 inherits(Sinker, Duplex);
 
-function Sinker (dir) {
+function Sinker (dir, opts) {
     var self = this;
-    if (!(this instanceof Sinker)) return new Sinker(dir);
+    if (!(this instanceof Sinker)) return new Sinker(dir, opts);
     Duplex.call(this);
+    
+    this.options = opts || {};
     
     var plex = mdm(function (stream) {
         stream.pipe(self.readCommands());
     });
     this.plex = plex;
     this.plexReadable = Readable().wrap(plex);
+    this.seq = 0;
     
     this.dir = dir;
     this.files = { local: {}, remote: {} };
     this.hashes = { local: {}, remote: {} };
     this._clockSkew = 0;
+    this._fs = this.options.fs || fs;
     
     this.cmd = plex.createStream('C');
     this._startTime = Date.now();
@@ -63,7 +67,7 @@ Sinker.prototype._write = function (buf, enc, next) {
 Sinker.prototype._prelude = function () {
     var self = this;
     var dir = path.resolve(this.dir);
-    var w = walkDir(dir);
+    var w = walkDir(dir, { fs: this._fs });
     var pending = 1;
     
     w.on('file', function (file, stat) {
@@ -130,9 +134,16 @@ Sinker.prototype._sync = function () {
         }
     });
     this.emit('ops', ops);
+    
+    if (this.options.write !== false) {
+        ops.forEach(function (op) {
+            self.send(op);
+        });
+    }
 };
 
-Sinker.prototype.execute = function (cmd) {
+Sinker.prototype.execute = function (seq, cmd) {
+    var self = this;
     if (cmd[0] === 'VERSION') {
         this._clockSkew = this._startTime - cmd[2];
     }
@@ -150,10 +161,29 @@ Sinker.prototype.execute = function (cmd) {
         if (!this.hashes.remote[hash]) this.hashes.remote[hash] = [];
         this.hashes.remote[hash].push(file);
     }
+    else if (cmd[0] === 'FETCH') {
+        if (!allowed(cmd[1])) {
+            return this.send([ 'ERROR', seq ]);
+        }
+        this.emit('fetch', cmd[1]);
+        var stream = this.plex.createWriteStream(seq);
+        var rs = this._fs.createReadStream(cmd[1]);
+        rs.on('error', onerror);
+        stream.on('error', onerror);
+        rs.pipe(stream);
+    }
+    else if (cmd[0] === 'MOVE') {
+        console.error('TODO', cmd);
+    }
+    
+    function onerror (err) {
+        self.send([ 'ERROR', seq, String(err && err.message || err) ]);
+    }
 };
 
 Sinker.prototype.send = function (cmd) {
-    this.cmd.write(JSON.stringify(cmd) + '\n');
+    var row = [ this.seq++ ].concat(cmd);
+    this.cmd.write(JSON.stringify(row) + '\n');
 };
 
 Sinker.prototype.readCommands = function () {
@@ -162,8 +192,9 @@ Sinker.prototype.readCommands = function () {
     sp.pipe(through(function (buf, enc, next) {
         try { var row = JSON.parse(buf.toString('utf8')) }
         catch (err) { return next() }
+        if (!Array.isArray(row)) return next();
         
-        self.execute(row);
+        self.execute(row[0], row.slice(1));
         next();
     }));
     return sp;
@@ -176,4 +207,12 @@ function hashFile (file, cb) {
     rs.pipe(h).pipe(concat(function (hash) {
         cb(null, hash);
     }));
+}
+
+function allowed (rfile) {
+    var file = path.resolve(rfile);
+    if (/^[\/\\]/.test(file)) return false;
+    if (/^\w+:/.test(file)) return false;
+    if (/\.\./.test(file)) return false;
+    return true;
 }
