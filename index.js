@@ -263,6 +263,7 @@ Sinker.prototype._sendOps = function (ops) {
         if (pending.length + Object.keys(fetches).length > 0) return;
         self.removeListener('ok', onok);
         self.removeListener('stream', onstream);
+        if (self.mode === 'LIVE') return;
         self.emit('sync');
         
         if (self.options.watch !== false) {
@@ -294,6 +295,8 @@ Sinker.prototype.execute = function (seq, cmd) {
     }
     else if (cmd[0] === 'HASH') {
         var file = cmd[1], hash = cmd[2];
+        if (!allowed(file)) return;
+        
         this.files.remote[file] = {
             hash: hash,
             time: cmd[3] + this._clockSkew
@@ -301,8 +304,12 @@ Sinker.prototype.execute = function (seq, cmd) {
         if (!this.hashes.remote[hash]) this.hashes.remote[hash] = [];
         this.hashes.remote[hash].push(file);
         
-        if (this.mode === 'LIVE') {
-            console.log(cmd); 
+        if (this.mode === 'LIVE' && this.hashes.local[hash]) {
+            var lfile = this.hashes.local[hash][0];
+            this._sendOps([ [ 'MOVE', lfile, file ] ]);
+        }
+        else if (this.mode === 'LIVE') {
+            this._sendOps([ [ 'FETCH', file ] ]);
         }
     }
     else if (cmd[0] === 'FETCH') {
@@ -323,23 +330,10 @@ Sinker.prototype.execute = function (seq, cmd) {
             return this.send([ 'ERROR', seq, 'not allowed' ]);
         }
         if (this.options.write === false) return;
-        
-        var src = path.join(this.dir, cmd[1]);
-        var dst = path.join(this.dir, cmd[2]);
-        var tmpfile = path.join(this._tmpdir, '.sinker-' + Math.random());
-        
-        var ss = this._fs.createReadStream(src);
-        var ts = this._fs.createWriteStream(tmpfile);
-        ss.on('error', onerror);
-        ts.on('error', onerror);
-        
-        ts.on('finish', function () {
-            self._fs.rename(tmpfile, dst, function (err) {
-                if (err) onerror(err);
-                else self.send([ 'OK', seq ]);
-            });
+        this._move(cmd[1], cmd[2], function (err) {
+            if (err) onerror(err)
+            else self.send([ 'OK', seq ])
         });
-        ss.pipe(ts);
     }
     else if (cmd[0] === 'OK') {
         this.emit.apply(this, [ 'ok', seq ].concat(cmd.slice(1)));
@@ -351,6 +345,26 @@ Sinker.prototype.execute = function (seq, cmd) {
     function onerror (err) {
         self.send([ 'ERROR', seq, String(err && err.message || err) ]);
     }
+};
+
+Sinker.prototype._move = function (rsrc, rdst, cb) {
+    var self = this;
+    var src = path.join(this.dir, rsrc);
+    var dst = path.join(this.dir, rdst);
+    var tmpfile = path.join(this._tmpdir, '.sinker-' + Math.random());
+    
+    var ss = this._fs.createReadStream(src);
+    var ts = this._fs.createWriteStream(tmpfile);
+    ss.on('error', cb);
+    ts.on('error', cb);
+    
+    ts.on('finish', function () {
+        self._fs.rename(tmpfile, dst, function (err) {
+            if (err) cb(err);
+            else cb(null);
+        });
+    });
+    ss.pipe(ts);
 };
 
 Sinker.prototype.send = function (cmd) {
@@ -383,6 +397,7 @@ Sinker.prototype._hashFile = function (file, cb) {
 }
 
 function allowed (rfile) {
+    if (typeof rfile !== 'string') return false;
     if (/^[\/\\]/.test(rfile)) return false;
     if (/^\w+:/.test(rfile)) return false;
     if (/\.\./.test(rfile)) return false;
