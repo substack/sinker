@@ -1,6 +1,7 @@
 var sinker = require('../');
 var path = require('path');
 var net = require('net');
+var fs = require('fs');
 var test = require('tape');
 var typewise = require('typewise');
 
@@ -35,7 +36,7 @@ test('pull', function (t) {
         fs.readdir(dir, function (err, files) {
             t.ifError(err);
             t.deepEqual(files, [
-                'foo', 'four', 'here.txt', 'one.txt', 'two.txt'
+                'foo', 'four.txt', 'here.txt', 'one.txt', 'two.txt'
             ]);
         });
         fs.readdir(path.join(dir, 'foo'), function (err, files) {

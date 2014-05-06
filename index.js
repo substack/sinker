@@ -8,6 +8,7 @@ var through = require('through2');
 var concat = require('concat-stream');
 var split = require('split');
 var mdm = require('mux-demux');
+var mkdirp = require('mkdirp');
 
 var Duplex = require('readable-stream').Duplex;
 var Readable = require('readable-stream').Readable;
@@ -147,19 +148,34 @@ Sinker.prototype._sendOps = function (ops) {
     var fetches = {};
     
     this.on('ok', onok);
+    this.on('stream', onstream);
     
-    this.on('stream', function f (stream) {
+    function onstream (stream) {
         if (!has(fetches, stream.meta)) return;
         var file = fetches[stream.meta];
         if (!file) return;
         fetches[stream.meta] = null; // flag to prevent duplicate writes
         
-        var ws = self._fs.createWriteStream(path.join(self.dir, file));
-        ws.on('finish', function () {
-            delete fetches[stream.meta];
-            done();
+        var rfile = path.join(self.dir, file);
+        var rdir = path.dirname(rfile);
+        mkdirp(rdir, { fs: self._fs }, function (err) {
+            if (err) return onerror(err);
+            
+            // TODO: write to tmpdir and atomic rename
+            var ws = self._fs.createWriteStream(rfile, 'utf8');
+            ws.on('error', onerror);
+            ws.on('finish', function () {
+                delete fetches[stream.meta];
+                done();
+            });
+            stream.pipe(ws);
         });
-    });
+        
+        function onerror (err) {
+            var seq = stream.meta;
+            self.send([ 'ERROR', seq, String(err && err.message || err) ]);
+        }
+    }
     
     ops.forEach(function (op) {
         var seq = self.send(op);
@@ -171,10 +187,10 @@ Sinker.prototype._sendOps = function (ops) {
     });
     
     function done () {
-        if (pending.length + Object.keys(fetches) > 0) return;
+        if (pending.length + Object.keys(fetches).length > 0) return;
         self.removeListener('ok', onok);
         self.removeListener('stream', onstream);
-        this.emit('sync');
+        self.emit('sync');
     }
     
     function onok (seq) {
@@ -211,7 +227,8 @@ Sinker.prototype.execute = function (seq, cmd) {
         this.emit('fetch', cmd[1]);
         
         var stream = this.plex.createWriteStream(seq);
-        var rs = this._fs.createReadStream(path.join(this.dir, cmd[1]));
+        var file = path.join(this.dir, cmd[1]);
+        var rs = this._fs.createReadStream(file, { encoding: 'utf8' });
         rs.on('error', onerror);
         stream.on('error', onerror);
         rs.pipe(stream);
