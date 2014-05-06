@@ -14,8 +14,8 @@ mkdirp.sync(path.join(__dirname, 'pull/b'));
 test('pull', function (t) {
     t.plan(8);
     
-    var a = sinker(path.join(__dirname, 'pull/a'), { watcher: false });
-    var b = sinker(path.join(__dirname, 'pull/b'), { watcher: false });
+    var a = sinker(path.join(__dirname, 'pull/a'), { watch: false });
+    var b = sinker(path.join(__dirname, 'pull/b'), { watch: false });
     
     a.once('ops', function (ops) {
         t.deepEqual(ops.sort(typewise.compare), []);
