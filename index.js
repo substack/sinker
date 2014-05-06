@@ -156,6 +156,8 @@ Sinker.prototype._sendOps = function (ops) {
         if (!file) return;
         fetches[stream.meta] = null; // flag to prevent duplicate writes
         
+        var rstream = stream.read ? stream : Readable().wrap(stream);
+        
         var rfile = path.join(self.dir, file);
         var rdir = path.dirname(rfile);
         mkdirp(rdir, { fs: self._fs }, function (err) {
@@ -168,7 +170,7 @@ Sinker.prototype._sendOps = function (ops) {
                 delete fetches[stream.meta];
                 done();
             });
-            stream.pipe(ws);
+            rstream.pipe(ws);
         });
         
         function onerror (err) {
