@@ -114,6 +114,11 @@ Sinker.prototype._watch = function (rel) {
     var file = path.join(this.dir, rel);
     
     var w = this._fs.watch(file);
+    w.on('error', function (err) {
+        if (err.message) err.message += ' while watching file ' + file;
+        self.emit('error', err);
+    });
+    
     this._watchers[rel] = w;
     var changing = false;
     
@@ -146,10 +151,14 @@ Sinker.prototype._watch = function (rel) {
             };
             if (!self.hashes.local[hash]) self.hashes.local[hash] = [];
             
-            var ix = self.hashes.local[prev.hash].indexOf(rel)
-            if (ix >= 0) self.hashes.local[prev.hash].splice(ix, 1);
+            if (prev) {
+                var ix = self.hashes.local[prev.hash].indexOf(rel)
+                if (ix >= 0) self.hashes.local[prev.hash].splice(ix, 1);
+            }
+            prev = self.files.local[rel];
             
             changing = false;
+console.log('SEND', file); 
             self.send([ 'HASH', rel, hash, stat.mtime.valueOf() ]);
         }
         
@@ -240,10 +249,12 @@ Sinker.prototype._sendOps = function (ops) {
             self._fs.rename(tmpfile, rfile, function (err) {
                 if (err) return onerror(err);
                 delete fetches[stream.meta];
-                done();
+                setTimeout(function () {
+                    self._watch(file);
+                    done();
+                }, 100);
             });
         }
-        
         function onerror (err) {
             var seq = stream.meta;
             self.send([ 'ERROR', seq, String(err && err.message || err) ]);
