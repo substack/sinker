@@ -12,7 +12,7 @@ rm.sync(path.join(__dirname, 'pull/b'));
 mkdirp.sync(path.join(__dirname, 'pull/b'));
 
 test('pull', function (t) {
-    t.plan(6);
+    t.plan(8);
     
     var a = sinker(path.join(__dirname, 'pull/a'));
     var b = sinker(path.join(__dirname, 'pull/b'));
@@ -42,6 +42,10 @@ test('pull', function (t) {
         fs.readdir(path.join(dir, 'foo'), function (err, files) {
             t.ifError(err);
             t.deepEqual(files, [ 'beep.txt' ]);
+        });
+        fs.readFile(path.join(dir, 'one.txt'), 'utf8', function (err, src) {
+            t.ifError(err);
+            t.equal(src, 'ONE\n');
         });
     });
     
