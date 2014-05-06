@@ -160,22 +160,30 @@ Sinker.prototype._sendOps = function (ops) {
         if (!file) return;
         fetches[stream.meta] = null; // flag to prevent duplicate writes
         
-        var rstream = stream.read ? stream : Readable().wrap(stream);
+        var tmpfile = path.join(this._tmpdir, '.sinker-' + Math.random());
+        var ts = self._fs.createWriteStream(tmpfile, 'utf8');
+        ts.on('error', onerror);
+        
+        var pending = 2;
+        ts.on('finish', function () {
+            if (--pending === 0) rename();
+        });
+        stream.pipe(ts);
         
         var rfile = path.join(self.dir, file);
         var rdir = path.dirname(rfile);
         mkdirp(rdir, { fs: self._fs }, function (err) {
             if (err) return onerror(err);
-            
-            // TODO: write to tmpdir and atomic rename
-            var ws = self._fs.createWriteStream(rfile, 'utf8');
-            ws.on('error', onerror);
-            ws.on('finish', function () {
+            if (--pending === 0) rename();
+        });
+        
+        function rename () {
+            fs.rename(tmpfile, rfile, function (err) {
+                if (err) return onerror(err);
                 delete fetches[stream.meta];
                 done();
             });
-            rstream.pipe(ws);
-        });
+        }
         
         function onerror (err) {
             var seq = stream.meta;
