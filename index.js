@@ -258,6 +258,7 @@ Sinker.prototype._sendOps = function (ops) {
         }
         else pending.push(seq);
     });
+    if (ops.length === 0) done();
     
     function done () {
         if (pending.length + Object.keys(fetches).length > 0) return;
