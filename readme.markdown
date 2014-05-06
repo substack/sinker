@@ -2,6 +2,8 @@
 
 synchronize remote directories
 
+[![build status](https://secure.travis-ci.org/substack/sinker.png)](http://travis-ci.org/substack/sinker)
+
 # example
 
 server:

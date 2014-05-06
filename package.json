@@ -23,6 +23,9 @@
   "scripts": {
     "test": "tape test/*.js"
   },
+  "engines": {
+    "node": ">=0.10"
+  },
   "repository": {
     "type": "git",
     "url": "git://github.com/substack/sinker.git"
